@@ -41,7 +41,7 @@ class SchedulerThread(QThread):
 class SchedulerApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Auto Tag Scheduler - v5.0.2")
+        self.setWindowTitle("Auto Message Scheduler - v5.0.2")
         self.setGeometry(100, 100, 800, 800)
 
         self.central_widget = QWidget()
@@ -68,19 +68,18 @@ class SchedulerApp(QMainWindow):
         self.max_concurrent_tasks = 10  # Set the maximum number of concurrent tasks
         self.task_semaphore = QSemaphore(self.max_concurrent_tasks)
 
-
     def create_input_form(self):
         form_layout = QVBoxLayout()
 
         self.page_id_input = self.create_input_field("Page ID:", form_layout)
         self.access_token_input = self.create_input_field("Access Token:", form_layout)
-        self.tag_id_input = self.create_input_field("Tag ID Name:", form_layout)
-
-        # Phone Numbers input
-        self.phone_input = QLineEdit()
-        self.phone_input.setPlaceholderText("Enter phone numbers separated by commas")
-        form_layout.addWidget(QLabel("Phone Numbers:"))
-        form_layout.addWidget(self.phone_input)
+        
+        # Replace Tag ID with Custom Message
+        self.custom_message_input = self.create_text_area("Custom Message:", form_layout)
+        
+        # Add Phone Numbers field
+        self.phone_numbers_input = self.create_input_field("Phone Numbers (comma-separated):", form_layout)
+        self.phone_numbers_input.setPlaceholderText("e.g., +1234567890, +0987654321, +1122334455")
 
         # Date Range: Since Date & Until Date
         self.since_date_input = QDateEdit()
@@ -122,8 +121,6 @@ class SchedulerApp(QMainWindow):
         form_layout.addWidget(self.schedule_time_label)
         form_layout.addWidget(self.schedule_time_input)
 
-        
-
         # Submit button
         self.submit_button = QPushButton("Submit")
         self.submit_button.clicked.connect(self.submit_form)
@@ -144,7 +141,7 @@ class SchedulerApp(QMainWindow):
     def create_schedule_table(self):
         self.schedule_table = QTableWidget()
         self.schedule_table.setColumnCount(8)
-        self.schedule_table.setHorizontalHeaderLabels(["Process ID", "Page ID", "Tag Name", "Since", "Until", "Schedule Date", "Status", "Total Processed"])
+        self.schedule_table.setHorizontalHeaderLabels(["Process ID", "Page ID", "Message Preview", "Phone Count", "Since", "Until", "Status", "Total Processed"])
         self.layout.addWidget(self.schedule_table)
 
     def create_log_terminal(self):
@@ -162,20 +159,51 @@ class SchedulerApp(QMainWindow):
         layout.addWidget(input_field)
         return input_field
 
+    def create_text_area(self, label_text, layout):
+        label = QLabel(label_text)
+        text_area = QTextEdit()
+        text_area.setPlaceholderText(f"Enter your {label_text.lower()}")
+        text_area.setMaximumHeight(100)  # Limit height to keep form compact
+        layout.addWidget(label)
+        layout.addWidget(text_area)
+        return text_area
+
+    def parse_phone_numbers(self, phone_string):
+        """Convert comma-separated phone numbers string to array"""
+        if not phone_string.strip():
+            return []
+        
+        # Split by comma and clean up each number
+        phone_numbers = [phone.strip() for phone in phone_string.split(',')]
+        # Filter out empty strings
+        phone_numbers = [phone for phone in phone_numbers if phone]
+        
+        return phone_numbers
+
     def submit_form(self):
         page_id = self.page_id_input.text()
         access_token = self.access_token_input.text()
-        tag_id_name = self.tag_id_input.text()
-        tag_id_name = self.tag_id_input.text()
+        custom_message = self.custom_message_input.toPlainText()
+        phone_numbers_string = self.phone_numbers_input.text()
         since_date = self.since_date_input.date().toString("yyyy-MM-dd")
         until_date = self.until_date_input.date().toString("yyyy-MM-dd")
 
-        if not all([page_id, access_token, tag_id_name]):
+        if not all([page_id, access_token, custom_message, phone_numbers_string]):
             QMessageBox.warning(self, "Input Error", "All fields are required!")
             return
 
+        # Convert phone numbers string to array
+        phone_numbers_array = self.parse_phone_numbers(phone_numbers_string)
+        
+        if not phone_numbers_array:
+            QMessageBox.warning(self, "Input Error", "Please enter at least one valid phone number!")
+            return
+
+        # Log the parsed phone numbers for verification
+        self.append_log(f"[INFO] Parsed {len(phone_numbers_array)} phone numbers: {phone_numbers_array}")
+
         if self.run_now_radio.isChecked():
-            self.run_task_now(page_id, access_token, tag_id_name, since_date, until_date)
+            self.run_task_now(page_id, access_token, custom_message, phone_numbers_array, since_date, until_date)
             schedule_time_display = "Now"
         else:
             schedule_date = self.schedule_date_input.date().toString("yyyy-MM-dd")
@@ -183,7 +211,7 @@ class SchedulerApp(QMainWindow):
             schedule_datetime = f"{schedule_date} {schedule_time}"
 
             job = schedule.every().day.at(schedule_time).do(
-                self.run_task_now(page_id, access_token, tag_id_name, since_date, until_date)
+                self.run_task_now, page_id, access_token, custom_message, phone_numbers_array, since_date, until_date
             )
             self.scheduled_jobs[page_id] = job
             schedule_time_display = schedule_datetime
@@ -202,13 +230,13 @@ class SchedulerApp(QMainWindow):
 
     def update_task_status(self, task_id, status):
         for row in range(self.schedule_table.rowCount()):
-            if self.schedule_table.item(row, 0).text() == task_id:
+            if self.schedule_table.item(row, 0) and self.schedule_table.item(row, 0).text() == task_id:
                 self.schedule_table.setItem(row, 6, QTableWidgetItem(status))
                 break
     
     def update_total_processed(self, task_id, total_processed):
         for row in range(self.schedule_table.rowCount()):
-            if self.schedule_table.item(row, 0).text() == task_id:
+            if self.schedule_table.item(row, 0) and self.schedule_table.item(row, 0).text() == task_id:
                 self.schedule_table.setItem(row, 7, QTableWidgetItem(total_processed))
                 break
 
@@ -216,24 +244,25 @@ class SchedulerApp(QMainWindow):
         timestamp = time.strftime("[%H:%M:%S]")
         self.log_terminal.append(f"{timestamp} {message}")
 
-
-    def run_task_now(self, page_id, access_token, tag_id_name, since_date, until_date):
+    def run_task_now(self, page_id, access_token, custom_message, phone_numbers_array, since_date, until_date):
         task_id = str(uuid.uuid4())  # ✅ generate unique process ID
-        worker = TaskWorker(task_id, page_id, access_token, tag_id_name, since_date, until_date, self.task_semaphore, self.scheduler_thread)
+        worker = TaskWorker(task_id, page_id, access_token, custom_message, phone_numbers_array, since_date, until_date, self.task_semaphore, self.scheduler_thread)
         self.thread_pool.start(worker)
         
+        # Create message preview (first 30 characters)
+        message_preview = custom_message[:30] + "..." if len(custom_message) > 30 else custom_message
+        phone_count = len(phone_numbers_array)
 
         row_position = self.schedule_table.rowCount()
         self.schedule_table.insertRow(row_position)
         self.schedule_table.setItem(row_position, 0, QTableWidgetItem(task_id))
         self.schedule_table.setItem(row_position, 1, QTableWidgetItem(page_id))
-        self.schedule_table.setItem(row_position, 2, QTableWidgetItem(tag_id_name))
-        self.schedule_table.setItem(row_position, 3, QTableWidgetItem(f"{since_date}"))
-        self.schedule_table.setItem(row_position, 4, QTableWidgetItem(f"{until_date}"))
-        self.schedule_table.setItem(row_position, 5, QTableWidgetItem("Now"))
+        self.schedule_table.setItem(row_position, 2, QTableWidgetItem(message_preview))
+        self.schedule_table.setItem(row_position, 3, QTableWidgetItem(str(phone_count)))
+        self.schedule_table.setItem(row_position, 4, QTableWidgetItem(since_date))
+        self.schedule_table.setItem(row_position, 5, QTableWidgetItem(until_date))
         self.schedule_table.setItem(row_position, 6, QTableWidgetItem("Queued"))
         self.schedule_table.setItem(row_position, 7, QTableWidgetItem("0"))
-
 
 
 def main_app():
