@@ -1,1 +1,0 @@
-from .ff_v2 import main_app as main_app_v2
