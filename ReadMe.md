@@ -115,4 +115,4 @@ If you encounter any issues:
 3. Ensure your access token has necessary permissions
 
 ## Version Information
-Current Version: V1.0.2
+Current Version: V1.0.4
