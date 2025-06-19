@@ -25,7 +25,7 @@ import uuid
 import re
 import json
 from datetime import datetime, timedelta
-from worker.auto_message_api import get_page_access_token, get_page_conversations, process_all_pages, get_all_page_ids
+from worker.auto_message_api import get_page_access_token, get_page_conversations, process_all_pages
 
 
 class TaskWorkerSignals(QObject):
@@ -61,6 +61,7 @@ class TaskWorker(QRunnable):
             
             if self.process_all_pages:
                 self.signals.log.emit(f"[INFO] Starting task {self.task_id} for ALL pages")
+                # self.signals.log.emit(f"🔍 DEBUG: Custom message in TaskWorker: {self.custom_message[:50]}..." if self.custom_message else "No custom message")
                 
                 # Create a custom print function that filters messages
                 def custom_print(*args, **kwargs):
@@ -72,7 +73,9 @@ class TaskWorker(QRunnable):
                         "Processing Page:",
                         "Processing batch",
                         "MATCH FOUND!",
-                        "Matched:"
+                        "Matched:",
+                        "AUTO-REPLY TRIGGERED",
+                        "Would send:"
                     ]):
                         self.signals.log.emit(message)
                 
@@ -82,6 +85,8 @@ class TaskWorker(QRunnable):
                 builtins.print = custom_print
                 
                 try:
+                    # self.signals.log.emit(f"📝 About to process with message: {self.custom_message[:50]}..." if self.custom_message else "No message to process")
+                    
                     process_all_pages(
                         self.access_token,
                         target_phones=self.phone_numbers,
@@ -224,10 +229,10 @@ class SchedulerApp(QMainWindow):
         form_group = QGroupBox("Task Configuration")
         form_layout = QFormLayout(form_group)
         
-        # Process all pages checkbox
-        self.process_all_pages_checkbox = QCheckBox("Process All Pages")
-        self.process_all_pages_checkbox.setChecked(True)  # Set to True by default
-        form_layout.addRow("", self.process_all_pages_checkbox)
+        # Removed Process all pages checkbox
+        # self.process_all_pages_checkbox = QCheckBox("Process All Pages")
+        # self.process_all_pages_checkbox.setChecked(True)  # Set to True by default
+        # form_layout.addRow("", self.process_all_pages_checkbox)
         
         self.access_token_input = QLineEdit()
         self.access_token_input.setPlaceholderText("Enter Access Token")
@@ -263,6 +268,7 @@ class SchedulerApp(QMainWindow):
         self.run_now_radio = QRadioButton("Run Immediately")
         self.schedule_radio = QRadioButton("Schedule for Later")
         self.run_now_radio.setChecked(True)
+        self.schedule_radio.setEnabled(False)  # Disable the schedule radio button
         
         mode_layout.addWidget(self.run_now_radio)
         mode_layout.addWidget(self.schedule_radio)
