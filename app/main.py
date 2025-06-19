@@ -324,7 +324,7 @@ class SchedulerApp(QMainWindow):
         self.scheduler_thread.start()
 
     def validate_phone_numbers(self, phone_string):
-        """Validate and parse phone numbers"""
+        """Validate, parse, and normalize phone numbers"""
         if not phone_string.strip():
             return []
         
@@ -338,8 +338,15 @@ class SchedulerApp(QMainWindow):
             if phone and phone_pattern.match(phone):
                 # Remove spaces and formatting, keep only digits and +
                 clean_phone = re.sub(r'[\s\-\(\)]', '', phone)
-                if len(clean_phone) >= 10:  # Minimum length check
-                    valid_phones.append(clean_phone)
+                # Normalize: +639xxxxxxxxx -> 09xxxxxxxxx
+                if clean_phone.startswith('+63') and len(clean_phone) == 13:
+                    normalized = '0' + clean_phone[3:]
+                elif clean_phone.startswith('09') and len(clean_phone) == 11:
+                    normalized = clean_phone
+                else:
+                    normalized = clean_phone  # fallback, keep as is
+                if len(normalized) == 11 and normalized.startswith('09'):
+                    valid_phones.append(normalized)
         
         return valid_phones
 
