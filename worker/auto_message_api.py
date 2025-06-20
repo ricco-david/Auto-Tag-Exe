@@ -21,7 +21,7 @@ def get_page_access_token(access_token, page_id):
     return None
 
 # --- Function: Get Filtered Conversations and Send Replies ---
-def get_page_conversations(page_id, page_access_token, user_access_token, since_input=None, until_input=None, target_phones=None, auto_reply_message=None):
+def get_page_conversations(page_id, page_access_token, access_token, since_input=None, until_input=None, target_phones=None, auto_reply_message=None):
     """
     Returns filtered conversations for a page and sends replies if needed.
     """
@@ -60,7 +60,7 @@ def get_page_conversations(page_id, page_access_token, user_access_token, since_
                             reply_response = send_reply_message(
                                 page_id=page_id,
                                 conversation_id=conversation_id,
-                                access_token=page_access_token,
+                                access_token=access_token,
                                 message_text=auto_reply_message
                             )
                             print("Reply Sent Response:", reply_response)
@@ -92,13 +92,13 @@ def send_reply_message(page_id, conversation_id, access_token, message_text):
         return {"error": str(err)}
 
 # --- Function: Process All Pages ---
-def process_all_pages(user_access_token, target_phones, auto_reply_message, since_input, until_input):
+def process_all_pages(access_token, target_phones, auto_reply_message, since_input, until_input):
     """
     Loops through all pages, calls get_page_conversations for each.
     """
     # Get all pages
     url = "https://pages.fm/api/v1/pages"
-    params = {"access_token": user_access_token}
+    params = {"access_token": access_token}
     try:
         response = requests.get(url, params=params)
         response.raise_for_status()
@@ -115,7 +115,7 @@ def process_all_pages(user_access_token, target_phones, auto_reply_message, sinc
             matches = get_page_conversations(
                 page_id=page_id,
                 page_access_token=page_access_token,
-                user_access_token=user_access_token,
+                access_token=access_token,
                 since_input=since_input,
                 until_input=until_input,
                 target_phones=target_phones,

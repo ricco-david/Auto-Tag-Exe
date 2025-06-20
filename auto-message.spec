@@ -44,7 +44,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='auto-message',
+    name='auto-message V1.0.5',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

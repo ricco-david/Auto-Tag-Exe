@@ -180,7 +180,7 @@ class SchedulerApp(QMainWindow):
     """Main application window"""
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Auto Message Scheduler - V1.0.4")
+        self.setWindowTitle("Auto Message Scheduler - V1.0.5")
         self.setGeometry(100, 100, 1000, 900)
         
         # Initialize variables
